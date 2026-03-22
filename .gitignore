@@ -210,3 +210,5 @@ datasets/
 .vscode/
 
 datasets/*
+notebooks/mi_t5_local
+notebooks/t5_prompt_generator
