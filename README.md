@@ -15,33 +15,67 @@ Este proyecto clasifica textos entre los siguientes cinco modelos:
 - **mistralai/mixtral-8x7b-instruct**
 
 # 📋 Fases del Proyecto
-## 1. Preprocesado y Tratamiento de Datos
 
-Nuestra primera prioridad ha sido la integridad y riqueza del dato. No nos hemos limitado a una limpieza superficial; hemos diseñado un pipeline de normalización estructural:
+A continuación detallamos el pipeline completo que hemos seguido a través de los distintos notebooks, centrándonos en el proceso y las herramientas empleadas.
+
+## 1. Preprocesamiento (`01_Preprocessing.ipynb`)
+Nuestra primera prioridad ha sido la integridad y riqueza del dato. No nos hemos limitado a una limpieza superficial; hemos diseñado un pipeline de normalización estructural profundo guiado por el motor de **Spacy**:
 - Hemos identificado y preservado **patrones de formato** (negritas, estructuras de listas y saltos de línea), convirtiéndolos en **etiquetas semánticas** (TAGS) para que los modelos reconozcan el sesgo de presentación de cada IA.
-- Hemos ejecutado una lematización exhaustiva mediante el pipeline de **Spacy**, permitiéndonos analizar la raíz léxica y la riqueza gramatical de cada respuesta sin el ruido de la flexión de palabras.
+- Hemos ejecutado una lematización exhaustiva mediante el pipeline de **Spacy** (`en_core_web_sm`), permitiéndonos analizar la raíz léxica y la riqueza gramatical de cada respuesta sin el ruido de la flexión de palabras, además de aislar adecuadamente las Stopwords problemáticas.
 
-## 2. Machine Learning Baseline
+## 2. Análisis Exploratorio de Datos / EDA (`02_EDA.ipynb`)
+Nos centramos en tratar de identificar posibles "huellas estilísticas" empíricas. Varios descubrimientos clave fundamentan el posterior Feature Engineering:
+- **Longitud y Riqueza Léxica (TTR / STTR):** Vimos que *Grok* resultó tener un vocabulario amplísimo (0.60 STTR) frente a la extrema repetición léxica de *Llama-3.2*.
+- **Formateo Computacional:** Confirmamos con las métricas que GPT y Gemini abusan bastante del markdown (negritas), Llama de las listas construidas numéricamente, y Mixtral genera textos desnudos o muy planos.
+- **N-gramas Discriminatorios (TF-IDF One-vs-Rest):** En vez del clásico TF-IDF global (que genera sesgos de vocabulario por culpa de los tópicos de los textos), usamos esta variante analítica asimétrica para aislar exclusivamente los *marcadores exclusivos de estilo* que usa cada modelo (ej. las contracciones perennes de *Grok*, o fórmulas introductorias puras).
+- **Proyección Bidimensional LSA 2D / PCA:** Validación inicial visual de la dispersión de las clases en el crudo espacio multidimensional *Bag of Words*.
+
+### 🛡️ Estrategia de Evaluación: Test *Out-of-Distribution* (OOD)
+Un detalle metodológico vital en este proyecto ha sido la forma de dividir nuestro dataset para la evaluación. Dado que los textos generados abordan diversas temáticas, si aplicábamos una división aleatoria tradicional (ej. 80/20), corríamos el riesgo de sufrir fuga de información (*data leakage*): textos con un vocabulario o estructura temática muy similar habrían caído tanto en el conjunto de *Train* como en el de *Test*.
+
+Para evitar que los modelos "hicieran trampa" memorizando el vocabulario de un tema específico, implementamos una estrategia **Out-of-Distribution (OOD)**. Decidimos **aislar un tópico entero del dataset** y reservarlo exclusivamente para el conjunto de *Test*. 
+
+De esta forma, obligamos a los algoritmos a aprender la verdadera **huella estilística y estructural** de cada IA, garantizando que cuando evaluamos su precisión (Accuracy), lo estamos haciendo sobre un contexto temático que el modelo jamás ha visto durante su entrenamiento.
+
+## 3. Machine Learning Baseline (`03_Machine_Learning.ipynb`)
 Para establecer un punto de comparación sólido, hemos implementado modelos de aprendizaje supervisado clásico:
 - Hemos desarrollado un sistema de vectorización híbrida, combinando TF-IDF a nivel de palabra y n-gramas, logrando capturar tanto el vocabulario preferente como las secuencias sintácticas recurrentes.
-- Resultados: Con el uso de **Linear SVC,** hemos alcanzado una **precisión del 93%**, confirmando que existen divergencias estadísticas significativas en la forma en que cada modelo estructura la información.
+- Hemos entrenado y contrapuesto a un **Multinomial Naive Bayes (MNB)** frente a algoritmos de hiperplano separador óptimo.
+- **Resultados:** Con el uso de un **Support Vector Machine (Linear SVC),** hemos alcanzado una precisión altísima de prácticamente el **93% en Test**, confirmando que existen divergencias estadísticas significativas en la forma en que cada modelo estructura inicialmente la información.
 
-## 3. Deep Learning
-Avanzamos hacia el uso de modelos de Deep Learning, más potentes y con más parámetros que los modelos de Machine Learning.
-- Hemos implementado arquitecturas **Bi-LSTM (Bidirectional Long Short-Term Memory)** con el fin de capturar la dependencia temporal y el contexto bidireccional del texto, analizando cómo fluye la narrativa de cada modelo.
+## 4. Deep Learning desde Cero (`04_Deep_Learning.ipynb`)
+Avanzamos hacia el uso de modelos de Deep Learning construidos manual y metódicamente desde cero, más potentes y con más parámetros que los modelos de Machine Learning.
+- Hemos implementado arquitecturas **Bi-LSTM (Bidirectional Long Short-Term Memory)** que recogen datos provenientes de capas de **Embeddings**, con el fin de capturar la dependencia temporal y el inmenso contexto bidireccional del texto analizando cómo fluye la narrativa de cada modelo.
+- **Manejo del Overfitting:** Durante las primeras iteraciones la red mostró graves picos de memorización espuria (llegando a asentar un 100% de precisión entrenando frente a un 85% de error por ruido en test). Para combatirlo, escalamos la arquitectura reduciendo las dimensiones y metiéndole regularización muy agresiva en el cuello de botella: creamos un *Stacked Bi-LSTM*, un **Dropout masivo intercapa del 50%** y aplicamos penalizaciones de olvido por *Weight Decay (L2)* vía optimizador Adam. Tras esta limpia, la red demostró estabilidad ascendiendo a un contundente 87% generalizando sobre datos no vistos.
 
-## 4. Transformers & Fine-Tuning
-Terminamos la parte de clasificación con un Fine Tuning de un Transformer. Concretamente BERT-Base-Uncached, que cuenta con 110M de parámetros.
-- **Optimización de Hardware:** Hemos entrenado el modelo en una NVIDIA RTX 4070 (8GB VRAM). Para procesar secuencias de 512 tokens (evitando el truncamiento de información crítica), hemos configurado técnicas de Precisión Mixta (AMP) y Acumulación de Gradientes.
-- **Arquitectura:** Hemos optado por congelar las primeras 6 capas del codificador para preservar el conocimiento lingüístico general, permitiendo que las capas superiores se especialicen exclusivamente en la detección de matices estilométricos.
+## 5. Transformers & Fine-Tuning de BERT (`05_BERT_FineTuning.ipynb`)
+Terminamos la parte central de clasificación con un Transfer Learning sobre un Transformer inmenso. Concretamente `bert-base-uncased`, que cuenta con 110M de parámetros de fábrica.
+- **Optimización de Hardware:** Hemos entrenado el modelo localmente en una NVIDIA RTX 4070 (8GB VRAM). Para procesar secuencias contiguas de 512 tokens (evitando el truncamiento de información crítica discursiva), hemos configurado e ingeniado técnicas de Precisión Mixta (AMP) y Recorte de Graduentes (Gradient Clipping).
+- **Arquitectura y Entrenamiento:** Hemos optado por *congelar (freeze)* deliberadamente las primeras 6 capas del codificador para preservar el sólido conocimiento lingüístico general adquirido, permitiendo que únicamente las capas neuronales superiores se especialicen en exclusividad sobre la detección de nuestros tenues matices estilométricos; optimizando los pesos con `AdamW` y ajustando la tasa de aprendizaje mediente un scheduler lineal con warmup (ggarantizando así una convergencia estable y preservando el sesgo).
+- **Resultados:** El modelo barrió por completo a los algoritmos basados en la simple semántica recurrente, marcando un sólido **93% de test accuracy** y sin aparentes brechas en la curva al validarlo (Train/Val gap estanco por debajo del punto).
 
-## 5. Parte Generativa: ¿Qué le preguntamos?
-Como validación final de la comprensión del modelo, hemos explorado la dirección inversa del lenguaje:
-- Hemos entrenado un modelo **T5-Small** (Text-to-Text) con el objetivo de realizar ingeniería inversa de prompts. A partir de una respuesta extensa, el modelo ha sido capaz de deducir y sintetizar la instrucción original que la generó, validando la coherencia semántica entre el output de la IA y la intención humana.
+## 6. Parte Generativa: Ingeniería Inversa de Prompts (`06_Generative.ipynb`)
+Como validación final conceptual, lúdica y clímax de la comprensión lectora del algoritmo, hemos explorado la dirección técnica diametralmente inversa del lenguaje:
+- Hemos descargado e instanciado una arquitectura **T5-Small** pre-entrenada por Google acoplando tareas de texto puro a texto (Text-to-Text).
+- Tras modificar el vector diana, el objetivo de la red fue intentar acometer con éxito pura *ingeniería inversa* de la intención humana primigenia. A partir de someter al modelo a digerir la respuesta desmedidamente extensa elaborada por una IA cualquiera (anexa al tag prescriptivo `"generate question: "`), este T5 generativo demostró que es empíricamente capaz de deducir, decodificar secuencialmente e hilar por síntesis computacional constructiva la instrucción original originaria (nuestro prompt), validando la irrefutable coherencia semántica implícita que sigue existiendo entre un output inmenso de la IA y el diminuto texto humano.
 
-# 🛠️ Especificaciones Técnicas
-- **Frameworks Principales:** PyTorch, Hugging Face Transformers.
-- **Procesamiento Lingüístico:** Spacy (en_core_web_sm), Scikit-learn.
-- **Infraestructura de Cómputo:** GPU con arquitectura Ada Lovelace y optimización de memoria mediante gradientes acumulados.
+---
 
 # 📊 Tabla comparativa de las técnicas empleadas para la clasificación texto -> modelo
+
+Resumen completo de las capacidades de predicción evaluadas siempre sobre datos nunca vistos (Test / Out-of-Distribution):
+
+| Arquitectura | Enfoque | Accuracy (Train) | Accuracy (Test) | Observaciones de rendimiento e inferencia |
+|--------------|---------|------------------|-----------------|-------------------------------------------|
+| **Naive Bayes (MNB)** | ML Baseline | 96% | ~89% | Sólido y rapidísimo como punto de validación estadístico inicial. |
+| **Linear SVC** | ML Baseline | 100% | **~93%** | Altísimo; demostró que de base había marcas estadísticas en los N-gramas letales. |
+| **Stacked Bi-LSTM** | DL From Scratch | 97% | 87% | Lee bien la bidireccionalidad contextual, penalizada por su natural tendencia al exceso de memorización (regularizada al 50% de dropout). |
+| **BERT (bert-base-uncased)** | DL preentrenado | ~94% | **93%** | El claro triunfador. Procesamiento atencional sin apenas riesgo real de *overfitting*. |
+
+---
+
+# 🛠️ Especificaciones Técnicas
+Para dotar de soporte matemático y de memoria a las arquitecturas mencionadas, el core se ha erigido sobre los siguientes pilares:
+- **Frameworks Principales:** PyTorch, Hugging Face Transformers Custom Pipeline.
+- **Procesamiento Lingüístico de Base:** Spacy (`en_core_web_sm`) y un conjunto de herramientas estadísticas con Scikit-learn.
+- **Infraestructura de Cómputo Local:** Cargas aceleradas en GPU con arquitectura Ada Lovelace acoplada (NVIDIA RTX 4070, 8GB). La barrera temporal e instruccional de la VRAM se eludió mediante programación avanzada de acumulación por gradientes segmentados y Precisión Computacional Mixta.
