@@ -1,3 +1,5 @@
+[![Repositorio en GitHub](https://img.shields.io/badge/GitHub-Ver_Repositorio-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/alejandrotm22/TextClassification)
+
 # Clasificación de Prompts Generados por IA 🤖📝
 
 Este repositorio contiene una investigación avanzada de Procesamiento de Lenguaje Natural (NLP) centrada en la "huella digital" de los modelos de lenguaje. El objetivo central ha sido determinar si los modelos de lenguaje actuales poseen rasgos distintivos únicos —una "huella dactilar" algorítmica— que permitan identificar su origen basándose exclusivamente en la estructura y el estilo del texto generado.
