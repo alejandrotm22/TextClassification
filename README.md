@@ -59,23 +59,53 @@ Como validación final conceptual, lúdica y clímax de la comprensión lectora 
 - Hemos descargado e instanciado una arquitectura **T5-Small** pre-entrenada por Google acoplando tareas de texto puro a texto (Text-to-Text).
 - Tras modificar el vector diana, el objetivo de la red fue intentar acometer con éxito pura *ingeniería inversa* de la intención humana primigenia. A partir de someter al modelo a digerir la respuesta desmedidamente extensa elaborada por una IA cualquiera (anexa al tag prescriptivo `"generate question: "`), este T5 generativo demostró que es empíricamente capaz de deducir, decodificar secuencialmente e hilar por síntesis computacional constructiva la instrucción original originaria (nuestro prompt), validando la irrefutable coherencia semántica implícita que sigue existiendo entre un output inmenso de la IA y el diminuto texto humano.
 
----
-
-# 📊 Tabla comparativa de las técnicas empleadas para la clasificación texto -> modelo
-
-Resumen completo de las capacidades de predicción evaluadas siempre sobre datos nunca vistos (Test / Out-of-Distribution):
-
-| Arquitectura | Enfoque | Accuracy (Train) | Accuracy (Test) | Observaciones de rendimiento e inferencia |
-|--------------|---------|------------------|-----------------|-------------------------------------------|
-| **Naive Bayes (MNB)** | ML Baseline | 96% | ~89% | Sólido y rapidísimo como punto de validación estadístico inicial. |
-| **Linear SVC** | ML Baseline | 100% | **~93%** | Altísimo; demostró que de base había marcas estadísticas en los N-gramas letales. |
-| **Stacked Bi-LSTM** | DL From Scratch | 97% | 87% | Lee bien la bidireccionalidad contextual, penalizada por su natural tendencia al exceso de memorización (regularizada al 50% de dropout). |
-| **BERT (bert-base-uncased)** | DL preentrenado | ~94% | **93%** | El claro triunfador. Procesamiento atencional sin apenas riesgo real de *overfitting*. |
-
----
-
-# 🛠️ Especificaciones Técnicas
+## 🛠️ Especificaciones Técnicas
 Para dotar de soporte matemático y de memoria a las arquitecturas mencionadas, el core se ha erigido sobre los siguientes pilares:
 - **Frameworks Principales:** PyTorch, Hugging Face Transformers Custom Pipeline.
 - **Procesamiento Lingüístico de Base:** Spacy (`en_core_web_sm`) y un conjunto de herramientas estadísticas con Scikit-learn.
 - **Infraestructura de Cómputo Local:** Cargas aceleradas en GPU con arquitectura Ada Lovelace acoplada (NVIDIA RTX 4070, 8GB). La barrera temporal e instruccional de la VRAM se eludió mediante programación avanzada de acumulación por gradientes segmentados y Precisión Computacional Mixta.
+## 📊 Análisis Comparativo de Modelos
+### Tabla Global de Rendimiento
+La siguiente tabla resume el rendimiento global de los modelos frente al conjunto de datos de evaluación (OOD - Out of Distribution | Space Exploration).  
+
+| Modelo | Exactitud (Accuracy) | F1-Score (Macro) | F1-Score (Weighted) | 
+| --------- | --------- | --------- | ---- |
+| **Linear SVM**    | **0.93**    | 0.93    | **0.93** |
+| **BERT**   | 0.93    | **0.94**   | 0.93 |
+| **Multinomial Naive Bayes**   | 0.88    | 0.89   | 0.88 |
+| **LSTM**   | 0.87    | 0.88   | 0.87 |
+
+### 🔍 Rendimiento por Clase (F1-Score en Test)
+
+Para entender mejor en qué modelos de lenguaje fallan o aciertan nuestros clasificadores, desglosamos el **F1-Score** por cada autor generado. Hemos resaltado en negrita el mejor resultado para cada IA:
+
+| Autor del Texto | Naive Bayes | Linear SVM | LSTM | BERT (Fine-Tuned) |
+| :--- | :---: | :---: | :---: | :---: |
+| **Grok-3-mini** | 0.93 | 0.96 | 0.92 | **0.97** |
+| **Gemini-2.5-lite** | 0.89 | 0.91 | 0.88 | **0.97** |
+| **Mixtral-8x7b** | 0.89 | **0.94** | 0.84 | 0.92 |
+| **GPT-4.1-nano** | 0.86 | **0.92** | 0.89 | 0.89 |
+| **Llama-3.2-1b** | 0.84 | **0.90** | 0.84 | **0.90** |
+
+### 🧠 Conclusiones del Análisis
+
+1. **El Sorprendente Empate (SVM vs. BERT):** El modelo tradicional **Linear SVM** ha logrado empatar en *Accuracy* global (0.93) con **BERT**, un modelo Transformer de última generación. Esto nos indica que las características lineales de los textos (TF-IDF, n-gramas) separan excepcionalmente bien las "muletillas" estructurales de cada LLM. Sin embargo, hay que destacar que SVM alcanzó un `1.00` perfecto en el entrenamiento, lo que indica un fuerte *overfitting* (sobreajuste), aunque demostró ser sorprendentemente robusto al generalizar en el set de Test (Out of Distribution).
+
+2. **BERT domina las clases difíciles:**
+   Aunque empatan en exactitud global, BERT demuestra su superioridad contextual al clasificar modelos que a priori son muy parecidos o tienen un estilo más camaleónico. Por ejemplo, BERT eleva la detección de *Gemini-2.5-lite* a un F1-Score de **0.97** (frente al 0.91 de SVM).
+
+3. **El sufrimiento del LSTM con datos OOD:**
+   La arquitectura recurrente (LSTM) parecía prometer mucho en entrenamiento (*Accuracy* del 0.97), pero es la que más sufre al enfrentarse a los datos de evaluación (baja a 0.87). Resulta muy revelador ver cómo se desploma su rendimiento (*F1-Score: 0.84*) al intentar clasificar los textos de **Mixtral-8x7b** y **Llama-3.2-1b**. Al observar las métricas detalladas, vemos desequilibrios fuertes: con Mixtral tiene mucha precisión pero poco *recall* (0.74), y con Gemini tiene un *recall* casi perfecto (0.99) pero baja precisión (0.79). Esto demuestra que le cuesta abstraer el estilo general frente a los Transformers.
+
+4. **Naive Bayes como Baseline ideal:**
+   Con un 0.88 de *Accuracy* y siendo el modelo más rápido de entrenar (fracciones de segundo), NB se consolida como un excelente punto de partida (*baseline*) para esta tarea.
+
+> **Veredicto Final:** Para un despliegue en producción donde los recursos y tiempos de inferencia sean críticos, **Linear SVM** es la opción ganadora por su impecable relación rendimiento/coste computacional. Sin embargo, si se busca la máxima fiabilidad semántica, evitar el sobreajuste extremo y se dispone de aceleración por GPU, **BERT** es la arquitectura definitiva.
+
+## 👥 Autores del Proyecto
+
+Este proyecto ha sido desarrollado por:
+
+* **[Alejandro Torres Martínez]** - [GitHub](https://github.com/alejandrotm22) | [LinkedIn](https://www.linkedin.com/in/alejandro-torres-martinez-b65490301/)
+* **[Nombre de tu compañero/a]** -  [GitHub](https://github.com/AleComan) | [LinkedIn](https://www.linkedin.com/in/aleecv/)
+
