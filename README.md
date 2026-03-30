@@ -106,6 +106,6 @@ Para entender mejor en qué modelos de lenguaje fallan o aciertan nuestros clasi
 
 Este proyecto ha sido desarrollado por:
 
-* **[Alejandro Torres Martínez]** - [GitHub](https://github.com/alejandrotm22) | [LinkedIn](https://www.linkedin.com/in/alejandro-torres-martinez-b65490301/)
-* **[Nombre de tu compañero/a]** -  [GitHub](https://github.com/AleComan) | [LinkedIn](https://www.linkedin.com/in/aleecv/)
+* **Alejandro Torres Martínez** - [GitHub](https://github.com/alejandrotm22) | [LinkedIn](https://www.linkedin.com/in/alejandro-torres-martinez-b65490301/)
+* **Alejandro Coman Venceslá** -  [GitHub](https://github.com/AleComan) | [LinkedIn](https://www.linkedin.com/in/aleecv/)
 
